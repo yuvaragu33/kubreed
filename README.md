@@ -15,6 +15,8 @@ Usage of /tmp/go-build2354197250/b001/exe/kubreed:
   -n, --namespaces int      Number of Namespaces to create (default 1)
   -p, --pods int32          Number of Pods to create per Deployment (default 3)
   -r, --rps int             Outgoing rps by each client Pod (default 1)
+  -h, --piipercent int      % of PII requests(default 0)
+  -o, --attackpercent int      % of Attack requests(default 0)
 
 
 
@@ -105,6 +107,7 @@ $ kubectl logs -n cba56j2ij4f1f847mf40-0   dep-0-676f58b484-6rnbl
 ```
 
 # Note
+
 In case you run into dockerhub limits for pulling the image, you can push the image to your own container registry and use the `--image` parameter while launching `kubreed`.
 ```
 $ kubreed --image "gcr.io/mycompany/kubreed-http:1.0"

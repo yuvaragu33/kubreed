@@ -10,9 +10,34 @@ import (
 	"time"
 )
 
+func formPiiAttackPayload(piiPercent int, attackPercent int) []string {
+	count := make([]string, piiPercent+attackPercent)
+	pii := [5]string{"cc=5555555555554444", "ssn=234-90-2232", "PassportID=100003106", "itins=912-79-1234", "bankroutingnumber=133563585"}
+
+	attack := [5]string{"1 and (select sleep(10) from dual where database() like '%')#", "1 and (select sleep(10) from dual where database() like '___')#",
+		"1;phpinfo()", "/../../../../etc/passwd", ">/><body/onload=alert()>"}
+	j := 0
+	for i := 0; i < piiPercent+attackPercent; i++ {
+		if i < piiPercent {
+			count[i] = pii[j]
+		} else {
+			count[i] = attack[j]
+		}
+		j++
+
+		if j == 5 {
+			j = 0
+		}
+	}
+	return count
+}
+
 func main() {
+
 	configJSON := os.Getenv(libs.ConfigEnvVar)
 	c, err := libs.GetConfigFromJSON(configJSON)
+	PiiAttackPayload := formPiiAttackPayload(c.PiiPercent, c.AttackPercent)
+	var url string
 	if err != nil {
 		log.Fatalf("ENV variable not set properly for configuration: %v", err)
 		return
@@ -22,7 +47,7 @@ func main() {
 
 	// prepare server
 	for i := 0; i < c.APICount; i++ {
-		endpoint := fmt.Sprintf("/api%d", i)
+		endpoint := fmt.Sprintf("/api%d.txt", i)
 		http.HandleFunc(endpoint, func(w http.ResponseWriter, r *http.Request) {
 			randSleep := rand.Int63n((c.ResponseTime).Milliseconds())
 			<-time.After(time.Duration(randSleep))
@@ -34,13 +59,21 @@ func main() {
 	// launch client threads that talk to other servers
 	go func() {
 		reqCounter := 0
+		reqCount := 0
 
 		for {
 			// We can add a select loop here and gracefully exit if needed
 			for _, svc := range c.RemoteServices {
 				for apiIter := 0; apiIter < c.APICount; apiIter++ {
 					go func(svc string, apiIter int) {
-						url := fmt.Sprintf("http://%s/api%d", svc, apiIter)
+						if reqCount == 100 {
+							reqCount = 0
+						}
+						if reqCount >= c.AttackPercent+c.PiiPercent {
+							url = fmt.Sprintf("http://%s/api%d.txt", svc, apiIter)
+						} else {
+							url = fmt.Sprintf("http://%s/api%d.txt?%s", svc, apiIter, PiiAttackPayload[reqCount])
+						}
 						resp, err := http.Get(url)
 						if err != nil {
 							log.Printf("HTTPClient GET %q failed: %v", url, err)
@@ -48,8 +81,10 @@ func main() {
 						}
 						log.Printf("HTTPClient GET %q: %v", url, resp.Status)
 						resp.Body.Close()
+
 					}(svc, apiIter)
 					reqCounter++
+					reqCount++
 
 					if reqCounter == c.RPS {
 						reqCounter = 0
