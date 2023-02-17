@@ -15,6 +15,7 @@ import (
 	flag "github.com/spf13/pflag"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
@@ -176,6 +177,16 @@ func main() {
 										Name:  libs.ConfigEnvVar,
 										Value: string(depConfigBytes),
 									}},
+									Resources: v1.ResourceRequirements{
+										Limits: v1.ResourceList{
+											"cpu":    resource.MustParse("20m"),
+											"memory": resource.MustParse("32Mi"),
+										},
+										Requests: v1.ResourceList{
+											"cpu":    resource.MustParse("20m"),
+											"memory": resource.MustParse("32Mi"),
+										},
+									},
 								}},
 							},
 						},
