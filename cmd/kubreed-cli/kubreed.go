@@ -167,8 +167,9 @@ func main() {
 							ObjectMeta: objectMeta,
 							Spec: v1.PodSpec{
 								Containers: []v1.Container{{
-									Name:  "kubreed-http",
-									Image: *image,
+									Name:            "kubreed-http",
+									Image:           *image,
+									ImagePullPolicy: "Always",
 									Ports: []v1.ContainerPort{{
 										ContainerPort: 80,
 										Protocol:      "TCP",

@@ -14,7 +14,7 @@ func formPiiAttackPayload(piiPercent int, attackPercent int) []string {
 	count := make([]string, piiPercent+attackPercent)
 	pii := [5]string{"cc=5555555555554444", "ssn=234-90-2232", "PassportID=100003106", "itins=912-79-1234", "bankroutingnumber=133563585"}
 
-	attack := [5]string{"1 and (select sleep(10) from dual where database() like '%')#", "1 and (select sleep(10) from dual where database() like '___')#",
+	attack := [5]string{"d=${jndi:ldap://127.0.0.1/a}", "id=Holly%22%20UNION%20SELECT%20database(),2,3,4,5,6,7%20--+",
 		"1;phpinfo()", "/../../../../etc/passwd", ">/><body/onload=alert()>"}
 	j := 0
 	for i := 0; i < piiPercent+attackPercent; i++ {
@@ -66,7 +66,7 @@ func main() {
 			for _, svc := range c.RemoteServices {
 				for apiIter := 0; apiIter < c.APICount; apiIter++ {
 					go func(svc string, apiIter int) {
-						if reqCount == 100 {
+						if reqCount >= 100 {
 							reqCount = 0
 						}
 						if reqCount >= c.AttackPercent+c.PiiPercent {
@@ -84,10 +84,10 @@ func main() {
 
 					}(svc, apiIter)
 					reqCounter++
-					reqCount++
 
 					if reqCounter == c.RPS {
 						reqCounter = 0
+						reqCount++
 						<-time.After(time.Second)
 						log.Print("---------------------")
 					}
