@@ -21,7 +21,8 @@ type Config struct {
 	APICount       int      `json:"apiCount"`
 	RPS            int      `json:"rps"`
 	RemoteServices []string `json:"RemoteServices"`
-
+	PiiPercent     int      `json:"piiPercent"`
+	AttackPercent  int      `json:"attackPercent"`
 	// See https://stackoverflow.com/questions/48050945/how-to-unmarshal-json-into-durations
 	// to understand why we need this mess
 	ResponseTime         time.Duration `json:"-"`

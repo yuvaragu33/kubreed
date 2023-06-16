@@ -15,6 +15,7 @@ import (
 	flag "github.com/spf13/pflag"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
@@ -23,14 +24,18 @@ import (
 )
 
 // default values
+// default values
 const (
-	Namespaces  = 1
-	Deployments = 5
-	Pods        = 3
-	APIs        = 10
-	RPS         = 1
-	Branching   = 4
-	Latency     = time.Second * 2
+	Namespaces     = 1
+	Namespace_name = ""
+	Deployments    = 5
+	Pods           = 3
+	APIs           = 10
+	RPS            = 1
+	Branching      = 4
+	Latency        = time.Second * 2
+	PII            = 0
+	ATTACK         = 0
 )
 
 func main() {
@@ -38,11 +43,12 @@ func main() {
 	deps := flag.IntP("deployments", "d", Deployments, "Number of Deployments/Services to create per Namespace")
 	pods := flag.Int32P("pods", "p", Pods, "Number of Pods to create per Deployment")
 	api := flag.IntP("apis", "a", APIs, "Number of APIs per Pod")
+	piipercent := flag.IntP("piipercent", "h", PII, "percentage of PII Requests ")
+	attackpercent := flag.IntP("attackpercent", "o", ATTACK, "percentage of attack Requests ")
 	rps := flag.IntP("rps", "r", RPS, "Outgoing rps by each client Pod")
 	branching := flag.IntP("branching", "b", Branching, "Number of Services to which each client Pod should make requests")
 	latency := flag.DurationP("latency", "l", Latency, "Maximum response time in milliseconds for each API call")
 	image := flag.StringP("image", "i", "psankar/kubreed-http:c5466e0", "Image for kubreed-http")
-
 	var kubeconfig *string
 	if home := homedir.HomeDir(); home != "" {
 		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
@@ -70,6 +76,11 @@ func main() {
 	// Multiply the three values to see if either of them is zero
 	if *rps**branching*int(*latency) == 0 {
 		log.Fatalf("rps, branching, respTime should all be non-zero for traffic to happen")
+		return
+	}
+
+	if *piipercent < 0 || (*piipercent+*attackpercent) > 100 || *attackpercent < 0 {
+		log.Fatalf("PII/Attack percentage should not be less than 0 and should not exceed 100")
 		return
 	}
 
@@ -101,6 +112,8 @@ func main() {
 			return
 		}
 		log.Printf("Created namespace: %q", ns)
+		// wait till 5 secods for ns to be up
+		time.Sleep(5 * time.Second)
 
 		for j := 0; j < *deps; j++ {
 			svcName := fmt.Sprintf("svc-%d", j)
@@ -130,6 +143,8 @@ func main() {
 			depConfig := libs.Config{
 				APICount:             *api,
 				RPS:                  *rps,
+				PiiPercent:           *piipercent,
+				AttackPercent:        *attackpercent,
 				RemoteServices:       remoteServices,
 				ResponseTimeInternal: latency.String(),
 			}
@@ -152,8 +167,9 @@ func main() {
 							ObjectMeta: objectMeta,
 							Spec: v1.PodSpec{
 								Containers: []v1.Container{{
-									Name:  "kubreed-http",
-									Image: *image,
+									Name:            "kubreed-http",
+									Image:           *image,
+									ImagePullPolicy: "Always",
 									Ports: []v1.ContainerPort{{
 										ContainerPort: 80,
 										Protocol:      "TCP",
@@ -162,6 +178,16 @@ func main() {
 										Name:  libs.ConfigEnvVar,
 										Value: string(depConfigBytes),
 									}},
+									Resources: v1.ResourceRequirements{
+										Limits: v1.ResourceList{
+											"cpu":    resource.MustParse("20m"),
+											"memory": resource.MustParse("32Mi"),
+										},
+										Requests: v1.ResourceList{
+											"cpu":    resource.MustParse("20m"),
+											"memory": resource.MustParse("32Mi"),
+										},
+									},
 								}},
 							},
 						},
@@ -188,6 +214,7 @@ func main() {
 						},
 						Ports: []v1.ServicePort{
 							{
+								Name: "http-svc",
 								Port: 80,
 								TargetPort: intstr.IntOrString{
 									Type:   intstr.Int,
