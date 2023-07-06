@@ -10,18 +10,23 @@ import (
 	"time"
 )
 
-func formPiiAttackPayload(piiPercent int, attackPercent int) []string {
-	count := make([]string, piiPercent+attackPercent)
+func formPiiAttackPayload(piiPercent int, attackPercent int, userPercent int) []string {
+	count := make([]string, piiPercent+attackPercent+userPercent+1)
 	pii := [5]string{"cc=5555555555554444", "ssn=234-90-2232", "PassportID=100003106", "itins=912-79-1234", "bankroutingnumber=133563585"}
 
 	attack := [5]string{"d=${jndi:ldap://127.0.0.1/a}", "id=Holly%22%20UNION%20SELECT%20database(),2,3,4,5,6,7%20--+",
 		"1;phpinfo()", "/../../../../etc/passwd", ">/><body/onload=alert()>"}
+
+	user := [5]string{"username=test1", "user=test2", "username=kube1", "user=kube2", "username=test3"}
+
 	j := 0
-	for i := 0; i < piiPercent+attackPercent; i++ {
+	for i := 0; i <= piiPercent+attackPercent+userPercent; i++ {
 		if i < piiPercent {
 			count[i] = pii[j]
-		} else {
+		} else if (i >= piiPercent) && (i < piiPercent+attackPercent) {
 			count[i] = attack[j]
+		} else {
+			count[i] = user[j]
 		}
 		j++
 
@@ -36,7 +41,7 @@ func main() {
 
 	configJSON := os.Getenv(libs.ConfigEnvVar)
 	c, err := libs.GetConfigFromJSON(configJSON)
-	PiiAttackPayload := formPiiAttackPayload(c.PiiPercent, c.AttackPercent)
+	PiiAttackPayload := formPiiAttackPayload(c.PiiPercent, c.AttackPercent, c.UserPercent)
 	var url string
 	if err != nil {
 		log.Fatalf("ENV variable not set properly for configuration: %v", err)
@@ -69,7 +74,7 @@ func main() {
 						if reqCount >= 100 {
 							reqCount = 0
 						}
-						if reqCount >= c.AttackPercent+c.PiiPercent {
+						if reqCount >= c.AttackPercent+c.PiiPercent+c.UserPercent {
 							url = fmt.Sprintf("http://%s/api%d.txt", svc, apiIter)
 						} else {
 							url = fmt.Sprintf("http://%s/api%d.txt?%s", svc, apiIter, PiiAttackPayload[reqCount])
